@@ -1,4 +1,4 @@
-CCPPFLAGS=-Wall -Werror -DOPENGL
+CCPPFLAGS=-Wall -Werror #-DOPENGL
 CFLAGS=-std=c99
 CPPFLAGS=
 CC=g++
@@ -7,11 +7,11 @@ OBJECTS=ripple.o OpenGLHelperFunctions.o
 ripple.out: $(OBJECTS) makefile
 	$(CC) -o ripple.out $(OBJECTS) -lGL -lSDL2 -lGLEW
 
-ripple.o: ripple.c
-	$(CC) -c ripple.c -o ripple.o $(CPPFLAGS) $(CCPPFLAGS)
+ripple.o: ripple.cpp ripple.h CommonDefines.h
+	$(CC) -c ripple.cpp -o ripple.o $(CPPFLAGS) $(CCPPFLAGS)
 
-OpenGLHelperFunctions.o: OpenGLHelperFunctions.c
-	$(CC) -c OpenGLHelperFunctions.c -o OpenGLHelperFunctions.o $(CPPFLAGS) $(CCPPFLAGS)
+OpenGLHelperFunctions.o: OpenGLHelperFunctions.cpp OpenGLHelperFunctions.h CommonDefines.h
+	$(CC) -c OpenGLHelperFunctions.cpp -o OpenGLHelperFunctions.o $(CPPFLAGS) $(CCPPFLAGS)
 
 clean:
-	rm *.o
+	rm -f *.o

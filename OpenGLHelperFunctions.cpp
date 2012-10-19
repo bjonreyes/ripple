@@ -1,6 +1,117 @@
-#include "ripple.h"
+#include "OpenGLHelperFunctions.h"
 
 
+MatrixSet::MatrixSet() :
+m_theta(0.0), m_fi(0.0), m_twistAngle(0.0), m_zNear(0.5), m_zFar(10.0)
+{
+}
+
+MatrixSet::~MatrixSet()
+{
+}
+
+void MatrixSet::SetCameraPosition(glm::vec3 position)
+{
+	m_CameraPosition = position;
+}
+
+void MatrixSet::LookAt(glm::vec3 point)
+{
+}
+
+glm::mat4 MatrixSet::GetFinalMatrix()
+{
+	return m_matrices.translation*m_matrices.upDown*m_matrices.leftRight*m_matrices.twist*m_matrices.perspective;
+}
+
+
+
+void MatrixSet::i_RefreshAllMatrices()
+{
+	i_RefreshVerticalRotation();
+	i_RefreshHorizontalRotation();
+	i_RefreshTwist();
+	i_RefreshTranslation();
+	// Perspective Not included because it rarely needs refreshing, and when it does you'll know
+}
+
+/*
+* Each of these four functions endevour to re-build their respective matrices using the new
+* angles and whatnot stored in the class. It would be more efficient in on-disk memory
+* to have seperate functions for initializing the matrices and for editing them.
+* It could be done with something as simple as an 'firstTime' boolean in the class,
+* and an if statement inside the function, but that would not be as efficient as two functions
+*/
+void MatrixSet::i_RefreshVerticalRotation()
+{
+	glm::mat4* updown = &(m_matrices.upDown);
+	float sine = std::sin(m_theta);
+	float cosine = std::cos(m_theta);
+
+	(*updown) = glm::mat4(0.0);
+	(*updown)[0].x = 1.0;
+	(*updown)[1].y = cosine;
+	(*updown)[1].z = sine;
+	(*updown)[2].y = -sine;
+	(*updown)[2].z = cosine;
+	(*updown)[3].w = 1.0;
+}
+void MatrixSet::i_RefreshHorizontalRotation()
+{
+	glm::mat4* leftright = &(m_matrices.leftRight);
+	float sine = std::sin(m_fi);
+	float cosine = std::cos(m_fi);
+
+	(*leftright) = glm::mat4(0.0);
+	(*leftright)[0].x = cosine;
+	(*leftright)[0].z = -sine;
+	(*leftright)[1].y = 1.0;
+	(*leftright)[2].x = sine;
+	(*leftright)[2].z = cosine;
+	(*leftright)[3].w = 1.0;
+}
+void MatrixSet::i_RefreshTwist()
+{
+	glm::mat4* twist = &(m_matrices.twist);
+	float sine = std::sin(m_twistAngle);
+	float cosine = std::cos(m_twistAngle);
+
+	(*twist) = glm::mat4(0.0);
+	(*twist)[0].x = cosine;
+	(*twist)[0].y = -sine;
+	(*twist)[1].x = sine;
+	(*twist)[1].y = cosine;
+	(*twist)[2].z = 1.0;
+	(*twist)[3].w = 1.0;
+}
+void MatrixSet::i_RefreshTranslation()
+{
+	glm::mat4* translation = &(m_matrices.translation);
+	
+	(*translation) = glm::mat4(0.0);
+	(*translation)[0].x = m_xScale;
+	(*translation)[1].y = m_yScale;
+	(*translation)[2].z = 1.0;
+	(*translation)[3].x = m_CameraPosition.x;
+	(*translation)[3].y = m_CameraPosition.y;
+	(*translation)[3].z = m_CameraPosition.z;
+	(*translation)[3].w = 1.0;
+}
+//should only be called upon window resize
+void MatrixSet::i_RefreshPerspective()
+{
+	glm::mat4* perspective = &(m_matrices.perspective);
+
+	(*perspective) = glm::mat4(0.0);
+
+	//there could be a parameter called a frustrum scale that could be multiplied by 0x and 1y, but I haven't found it useful in the past
+	(*perspective)[0].x = g_windowHeight / (float)g_windowWidth;
+	(*perspective)[1].y = 1.0;
+	float difference = m_zNear - m_zFar;
+	(*perspective)[2].z = -(m_zFar + m_zNear)/difference;
+	(*perspective)[2].w = -1.0;
+	(*perspective)[3].z = -(2*m_zNear*m_zFar)/difference;
+}
 
 /*
 function: OGLErrorCheck
@@ -62,13 +173,14 @@ Return Value: The identifier for the compiled shader
 */
 GLuint CompileShader(GLenum eShaderType, const char* filename, int debugOption)
 {
-    if (debugOption) printf("Compilation of Shader: %s", filename);
+    if (debugOption) printf("Compilation of Shader: %s\n", filename);
     GLuint shader = glCreateShader(eShaderType);
     FILE* fin;
     fin = fopen(filename, "r");
     if (!fin)
     {
-        printf("\tCould not open shader file %s", filename);
+        printf("\tCould not open shader file %s\n", filename);
+		return 0;
     }
     fseek(fin, 0, SEEK_END);
     int size = ftell(fin);
@@ -110,6 +222,7 @@ GLuint CompileShader(GLenum eShaderType, const char* filename, int debugOption)
     {
         if (debugOption) printf("\tCompiled Cleanly\n");
     }
+    if (debugOption) printf("Finished Compilation of Shader: %s\n", filename);
     //check errors for fun
     OGLErrorCheck(__LINE__);
     return shader;
@@ -131,21 +244,21 @@ GLint MakeShaderProgram(const char* vertFileName, const char* geoFileName, const
     //compile each of the shaders that isn't null
     if (vertFileName != '\0')
     {
-        GLuint vertShader = CompileShader(GL_VERTEX_SHADER, vertFileName, 0);
+        GLuint vertShader = CompileShader(GL_VERTEX_SHADER, vertFileName, debugOption);
         if (vertShader == 0)
             return 0;
         glAttachShader(programID, vertShader);
     }
     if (geoFileName != '\0')
     {
-        GLuint geoShader = CompileShader(GL_GEOMETRY_SHADER, geoFileName, 0);
+        GLuint geoShader = CompileShader(GL_GEOMETRY_SHADER, geoFileName, debugOption);
         if (geoShader == 0)
             return 0;
         glAttachShader(programID, geoShader);
     }
     if (fragFileName != '\0')
     {
-        GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, fragFileName, 0);
+        GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, fragFileName, debugOption);
         if (fragShader == 0)
             return 0;
         glAttachShader(programID, fragShader);
